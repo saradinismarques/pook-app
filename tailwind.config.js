@@ -23,6 +23,7 @@ module.exports = {
       maxWidth: {
         content: '800px',
         actions: '420px',
+        card: '340px',
       },
       fontSize: {
         wordmark: ['46px', { lineHeight: '54px' }],

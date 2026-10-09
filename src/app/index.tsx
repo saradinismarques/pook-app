@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -6,7 +7,9 @@ import { BookLogo } from '@/components/ui/book-logo';
 import { Fonts } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const handleDiscoverBooks = () => {};
+  const handleDiscoverBooks = () => {
+    router.push('/discover');
+  };
   const handleMyBooks = () => {};
 
   return (
