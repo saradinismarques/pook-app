@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { ActivityIndicator, Pressable, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,17 +11,28 @@ import { Fonts } from '@/constants/theme';
 import { useDiscoverBooks } from '@/hooks/use-discover-books';
 import type { SwipeDirection } from '@/types/book';
 
+type DiscoverParams = {
+  listId?: string;
+  listName?: string;
+};
+
 export default function DiscoverScreen() {
-  const { current, status, error, hasMore, likedBooks, swipe, retry } = useDiscoverBooks();
+  const { listId: listIdParam, listName: listNameParam } = useLocalSearchParams<DiscoverParams>();
+
+  const listId = listIdParam ? Number(listIdParam) : undefined;
+  const hasList = typeof listId === 'number' && Number.isFinite(listId);
+
+  const { current, status, error, hasMore, likedBooks, sourceEmpty, swipe, retry } =
+    useDiscoverBooks({ listId: hasList ? listId : undefined });
   const cardRef = useRef<SwipeableBookCardHandle>(null);
   const pendingRef = useRef(false);
   const isDark = useColorScheme() === 'dark';
 
-  const goHome = useCallback(() => {
+  const goBack = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/');
+      router.replace('/lists');
     }
   }, []);
 
@@ -56,6 +67,20 @@ export default function DiscoverScreen() {
       );
     }
 
+    if (sourceEmpty) {
+      return (
+        <View className="w-full max-w-actions items-center gap-5 self-center">
+          <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
+            No books in this list
+          </Text>
+          <Text className="text-center text-sm text-taupe dark:text-fog">
+            This list doesn&apos;t have any books yet. Try another list or all books.
+          </Text>
+          <AppButton label="Pick another list" onPress={goBack} />
+        </View>
+      );
+    }
+
     if (status === 'error') {
       return (
         <View className="w-full max-w-actions items-center gap-5 self-center">
@@ -75,7 +100,7 @@ export default function DiscoverScreen() {
         <View className="items-center gap-4">
           <ActivityIndicator color="#C0562F" />
           <Text className="text-sm font-medium text-taupe dark:text-fog">
-            Finding books for you…
+            {hasList ? 'Loading list…' : 'Finding books for you…'}
           </Text>
         </View>
       );
@@ -84,12 +109,18 @@ export default function DiscoverScreen() {
     return (
       <View className="w-full max-w-actions items-center gap-5 self-center">
         <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
-          You&apos;re all caught up
+          {hasList ? "You've seen them all" : "You're all caught up"}
         </Text>
         <Text className="text-center text-sm text-taupe dark:text-fog">
-          You&apos;ve seen every book for now.
+          {hasList
+            ? 'You have reached the end of this list.'
+            : 'You’ve seen every book for now.'}
         </Text>
-        <AppButton label="Start over" onPress={retry} />
+        <AppButton
+          label={hasList ? 'Start over from the top' : 'Start over'}
+          onPress={retry}
+          variant="secondary"
+        />
       </View>
     );
   };
@@ -101,15 +132,17 @@ export default function DiscoverScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={goHome}
+            onPress={goBack}
             className="h-10 w-10 items-center justify-center rounded-full border border-edge bg-sand active:opacity-80 dark:border-edge-dark dark:bg-coal">
             <Ionicons name="chevron-back" size={22} color={isDark ? '#F5EDE3' : '#2B211A'} />
           </Pressable>
 
           <Text
             style={{ fontFamily: Fonts.serif }}
-            className="text-2xl font-bold text-ink dark:text-haze">
-            Discover
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            className="flex-1 px-2 text-center text-2xl font-bold text-ink dark:text-haze">
+            {hasList ? 'Picking books' : 'All Books'}
           </Text>
 
           <View
@@ -120,7 +153,12 @@ export default function DiscoverScreen() {
           </View>
         </View>
 
-        <View className="flex-1 justify-center py-2">
+        <View className="flex-1 justify-center gap-3 py-2">
+          {hasList && listNameParam ? (
+            <Text className="w-full px-1 text-center text-sm font-semibold text-taupe dark:text-fog">
+              {listNameParam}
+            </Text>
+          ) : null}
           <View className="w-full max-w-card flex-1 self-center">{renderBody()}</View>
         </View>
 

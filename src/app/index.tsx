@@ -7,8 +7,8 @@ import { BookLogo } from '@/components/ui/book-logo';
 import { Fonts } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const handleDiscoverBooks = () => {
-    router.push('/discover');
+  const handlePickBooks = () => {
+    router.push('/lists');
   };
   const handleMyBooks = () => {};
 
@@ -32,7 +32,7 @@ export default function HomeScreen() {
           </View>
 
           <View className="w-full max-w-actions self-center gap-4">
-            <AppButton label="Discover books" onPress={handleDiscoverBooks} />
+            <AppButton label="Pick books" onPress={handlePickBooks} />
             <AppButton label="My Books" variant="secondary" onPress={handleMyBooks} />
           </View>
         </ScrollView>
