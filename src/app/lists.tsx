@@ -9,7 +9,8 @@ import { ListSearchBar } from '@/components/lists/list-search-bar';
 import { AppButton } from '@/components/ui/app-button';
 import { Fonts } from '@/constants/theme';
 import { useBookLists } from '@/hooks/use-book-lists';
-import type { BookList } from '@/types/list';
+import { useUserLists } from '@/hooks/use-user-lists';
+import type { BookList, UserList } from '@/types/list';
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -31,6 +32,7 @@ export default function ListsScreen() {
 
   const { lists, total, status, loadingMore, error, hasMore, loadMore, retry } =
     useBookLists(debouncedSearch);
+  const { lists: userLists } = useUserLists();
   const isDark = useColorScheme() === 'dark';
 
   const isSearching = debouncedSearch.trim().length > 0;
@@ -73,12 +75,80 @@ export default function ListsScreen() {
     router.push('/discover');
   }, []);
 
-  const handleList = useCallback((list: BookList) => {
+  const handleCreateList = useCallback(() => {
+    router.push('/lists/create');
+  }, []);
+
+  const handlePublicList = useCallback((list: BookList) => {
     router.push({
       pathname: '/discover',
       params: { listId: String(list.id), listName: list.name },
     });
   }, []);
+
+  const handleUserList = useCallback((list: UserList) => {
+    router.push({
+      pathname: '/discover',
+      params: { userListId: list.id, listName: list.name },
+    });
+  }, []);
+
+  const handleEditUserList = useCallback((list: UserList) => {
+    router.push({ pathname: '/lists/create', params: { listId: list.id } });
+  }, []);
+
+  const renderUserLists = () => {
+    if (isSearching || userLists.length === 0) {
+      return null;
+    }
+
+    return (
+      <View className="gap-3 pb-4">
+        <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+          Your lists · {userLists.length}
+        </Text>
+        {userLists.map((list) => (
+          <ListRow
+            key={list.id}
+            name={list.name}
+            meta={`${list.books.length} ${list.books.length === 1 ? 'book' : 'books'}`}
+            icon="bookmark-outline"
+            onPress={() => handleUserList(list)}
+            onEdit={() => handleEditUserList(list)}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  const renderListHeader = () => (
+    <View>
+      {!isSearching ? (
+        <View className="gap-3 pb-4">
+          <ListRow
+            name="All Books"
+            meta="Swipe every popular book"
+            icon="library-outline"
+            onPress={handleAllBooks}
+          />
+          <ListRow
+            name="Create a list"
+            meta="Search books and build your own"
+            icon="add-circle-outline"
+            onPress={handleCreateList}
+          />
+        </View>
+      ) : null}
+
+      {renderUserLists()}
+
+      <Text className="pb-3 text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+        {isSearching
+          ? `Results${total > 0 ? ` · ${total.toLocaleString()}` : ''}`
+          : `Public lists${total > 0 ? ` · ${total.toLocaleString()}` : ''}`}
+      </Text>
+    </View>
+  );
 
   const renderFooter = () => {
     if (loadingMore) {
@@ -147,20 +217,23 @@ export default function ListsScreen() {
 
     if (lists.length === 0) {
       return (
-        <View className="flex-1 items-center justify-center gap-4">
-          <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
-            {isSearching ? 'No lists match your search' : 'No public lists right now'}
-          </Text>
-          <Text className="text-center text-sm text-taupe dark:text-fog">
-            {isSearching
-              ? `Nothing found for “${debouncedSearch.trim()}”. Try a different search.`
-              : 'New lists show up here.'}
-          </Text>
-          <AppButton
-            label={isSearching ? 'Clear search' : 'Try again'}
-            variant="secondary"
-            onPress={isSearching ? handleSearchClear : retry}
-          />
+        <View className="flex-1">
+          {renderListHeader()}
+          <View className="flex-1 items-center justify-center gap-4">
+            <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
+              {isSearching ? 'No lists match your search' : 'No public lists right now'}
+            </Text>
+            <Text className="text-center text-sm text-taupe dark:text-fog">
+              {isSearching
+                ? `Nothing found for “${debouncedSearch.trim()}”. Try a different search.`
+                : 'New lists show up here.'}
+            </Text>
+            <AppButton
+              label={isSearching ? 'Clear search' : 'Try again'}
+              variant="secondary"
+              onPress={isSearching ? handleSearchClear : retry}
+            />
+          </View>
         </View>
       );
     }
@@ -177,7 +250,7 @@ export default function ListsScreen() {
             meta={formatListMeta(item)}
             description={item.description}
             featured={item.featured}
-            onPress={() => handleList(item)}
+            onPress={() => handlePublicList(item)}
           />
         )}
         ItemSeparatorComponent={() => <View className="h-3" />}
@@ -185,6 +258,7 @@ export default function ListsScreen() {
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        ListHeaderComponent={renderListHeader}
         ListFooterComponent={renderFooter}
       />
     );
@@ -219,23 +293,6 @@ export default function ListsScreen() {
             onChangeText={handleSearchChange}
             onClear={handleSearchClear}
           />
-        </View>
-
-        <View className="gap-3 pb-3">
-          {!isSearching ? (
-            <ListRow
-              name="All Books"
-              meta="Swipe every popular book"
-              icon="library-outline"
-              onPress={handleAllBooks}
-            />
-          ) : null}
-
-          <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
-            {isSearching
-              ? `Results${total > 0 ? ` · ${total.toLocaleString()}` : ''}`
-              : `Public lists${total > 0 ? ` · ${total.toLocaleString()}` : ''}`}
-          </Text>
         </View>
 
         {renderBody()}

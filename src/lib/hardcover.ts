@@ -71,6 +71,23 @@ const HYDRATE_LISTS_QUERY = `
   }
 `;
 
+const SEARCH_BOOKS_QUERY = `
+  query SearchBooks($query: String!, $page: Int!, $perPage: Int!) {
+    search(query: $query, query_type: "Book", page: $page, per_page: $perPage) {
+      error
+      results
+    }
+  }
+`;
+
+const HYDRATE_BOOKS_QUERY = `
+  query HydrateBooks($ids: [Int!]!) {
+    books(
+      where: { id: { _in: $ids }, is_partial_book: { _neq: true } }
+    ) { ${BOOK_FIELDS} }
+  }
+`;
+
 const LIST_BOOKS_QUERY = `
   query ListBooks($listId: Int!, $limit: Int!, $offset: Int!) {
     list_books(
@@ -287,6 +304,26 @@ export async function fetchBookBatch(signal?: AbortSignal): Promise<Book[]> {
     .filter((book): book is Book => book !== null);
 }
 
+export type FetchPopularBooksOptions = {
+  limit?: number;
+  offset?: number;
+};
+
+export async function fetchPopularBooks(
+  { limit = PAGE_SIZE, offset = 0 }: FetchPopularBooksOptions = {},
+  signal?: AbortSignal
+): Promise<Book[]> {
+  const data = await graphqlRequest<{ books?: HardcoverBook[] }>(
+    DISCOVER_QUERY,
+    { limit, offset },
+    signal
+  );
+
+  return (data.books ?? [])
+    .map(mapBook)
+    .filter((book): book is Book => book !== null);
+}
+
 export type FetchPublicListsOptions = {
   limit?: number;
   offset?: number;
@@ -388,4 +425,63 @@ export async function searchLists(
     .filter((list): list is BookList => list !== undefined);
 
   return { lists, total };
+}
+
+export type SearchBooksOptions = {
+  query: string;
+  page?: number;
+  perPage?: number;
+};
+
+export type SearchBooksResult = {
+  books: Book[];
+  total: number;
+};
+
+export async function searchBooks(
+  { query, page = 1, perPage = SEARCH_PAGE_SIZE }: SearchBooksOptions,
+  signal?: AbortSignal
+): Promise<SearchBooksResult> {
+  const data = await graphqlRequest<{ search?: SearchPayload }>(
+    SEARCH_BOOKS_QUERY,
+    { query, page, perPage },
+    signal
+  );
+
+  const search = data.search;
+  if (search?.error) {
+    throw new HardcoverError(search.error);
+  }
+
+  const results = search?.results;
+  const hits = results?.hits ?? [];
+  const total = results?.found ?? 0;
+
+  const ids = hits
+    .map((hit) => Number(hit?.document?.id))
+    .filter((id) => Number.isFinite(id));
+
+  if (ids.length === 0) {
+    return { books: [], total };
+  }
+
+  const hydrated = await graphqlRequest<{ books?: HardcoverBook[] }>(
+    HYDRATE_BOOKS_QUERY,
+    { ids },
+    signal
+  );
+
+  const byId = new Map<string, Book>();
+  for (const raw of hydrated.books ?? []) {
+    const book = mapBook(raw);
+    if (book) {
+      byId.set(book.id, book);
+    }
+  }
+
+  const books = ids
+    .map((id) => byId.get(String(id)))
+    .filter((book): book is Book => book !== undefined);
+
+  return { books, total };
 }

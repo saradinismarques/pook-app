@@ -11,6 +11,7 @@ export type ListRowProps = {
   featured?: boolean;
   icon?: ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
+  onEdit?: () => void;
 };
 
 export function ListRow({
@@ -20,6 +21,7 @@ export function ListRow({
   featured = false,
   icon = 'list-outline',
   onPress,
+  onEdit,
 }: ListRowProps) {
   return (
     <Pressable
@@ -62,6 +64,17 @@ export function ListRow({
           </Text>
         ) : null}
       </View>
+
+      {onEdit ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${name}`}
+          onPress={onEdit}
+          hitSlop={8}
+          className="h-9 w-9 items-center justify-center rounded-full border border-edge bg-paper active:opacity-80 dark:border-edge-dark dark:bg-night">
+          <Ionicons name="pencil" size={16} color="#7C6B5A" />
+        </Pressable>
+      ) : null}
 
       <Ionicons name="chevron-forward" size={20} color="#AC9C8B" />
     </Pressable>

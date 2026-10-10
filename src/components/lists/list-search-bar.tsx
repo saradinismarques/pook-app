@@ -5,25 +5,33 @@ export type ListSearchBarProps = {
   value: string;
   onChangeText: (text: string) => void;
   onClear: () => void;
+  placeholder?: string;
+  accessibilityLabel?: string;
 };
 
-export function ListSearchBar({ value, onChangeText, onClear }: ListSearchBarProps) {
+export function ListSearchBar({
+  value,
+  onChangeText,
+  onClear,
+  placeholder = 'Search public lists',
+  accessibilityLabel = 'Search lists',
+}: ListSearchBarProps) {
   return (
     <View className="flex-row items-center gap-2 rounded-full bg-edge px-4 py-3 dark:bg-edge-dark">
       <Ionicons name="search" size={18} color="#7C6B5A" />
 
       <TextInput
-        accessibilityLabel="Search lists"
+        accessibilityLabel={accessibilityLabel}
         accessibilityRole="search"
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="never"
         onChangeText={onChangeText}
-        placeholder="Search public lists"
+        placeholder={placeholder}
         placeholderTextColor="#7C6B5A"
         returnKeyType="search"
         value={value}
-        className="flex-1 p-0 text-base text-ink dark:text-haze"
+        className="flex-1 p-0 text-base leading-tight text-ink dark:text-haze"
       />
 
       {value.length > 0 ? (

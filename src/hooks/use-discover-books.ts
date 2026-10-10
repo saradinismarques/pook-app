@@ -11,6 +11,7 @@ export type DiscoverStatus = 'loading' | 'ready' | 'error';
 
 export type UseDiscoverBooksOptions = {
   listId?: number;
+  books?: Book[];
 };
 
 export type UseDiscoverBooksResult = {
@@ -24,7 +25,7 @@ export type UseDiscoverBooksResult = {
   retry: () => void;
 };
 
-export function useDiscoverBooks({ listId }: UseDiscoverBooksOptions = {}): UseDiscoverBooksResult {
+export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooksOptions = {}): UseDiscoverBooksResult {
   const [books, setBooks] = useState<Book[]>([]);
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState<DiscoverStatus>('loading');
@@ -54,15 +55,22 @@ export function useDiscoverBooks({ listId }: UseDiscoverBooksOptions = {}): UseD
       isFetchingRef.current = true;
 
       try {
-        const incoming =
-          listId !== undefined
-            ? await fetchListBooks({ listId, limit: LIST_BATCH_SIZE, offset: listOffset.current }, signal)
-            : await fetchBookBatch(signal);
+        let incoming: Book[];
+        if (localBooks) {
+          incoming = mode === 'initial' ? localBooks : [];
+        } else if (listId !== undefined) {
+          incoming = await fetchListBooks(
+            { listId, limit: LIST_BATCH_SIZE, offset: listOffset.current },
+            signal
+          );
+        } else {
+          incoming = await fetchBookBatch(signal);
+        }
         if (!mounted.current) {
           return;
         }
 
-        if (listId !== undefined) {
+        if (!localBooks && listId !== undefined) {
           listOffset.current += incoming.length;
         }
 
@@ -71,6 +79,7 @@ export function useDiscoverBooks({ listId }: UseDiscoverBooksOptions = {}): UseD
 
         emptyBatches.current = fresh.length === 0 ? emptyBatches.current + 1 : 0;
         const sourceExhausted =
+          Boolean(localBooks) ||
           incoming.length === 0 ||
           (listId !== undefined && incoming.length < LIST_BATCH_SIZE) ||
           emptyBatches.current >= MAX_EMPTY_BATCHES;
@@ -78,7 +87,8 @@ export function useDiscoverBooks({ listId }: UseDiscoverBooksOptions = {}): UseD
           setHasMore(false);
         }
 
-        if (mode === 'initial' && listId !== undefined && incoming.length === 0) {
+        const isLocalSource = Boolean(localBooks) || listId !== undefined;
+        if (mode === 'initial' && isLocalSource && incoming.length === 0) {
           setSourceEmpty(true);
         }
 
@@ -100,7 +110,7 @@ export function useDiscoverBooks({ listId }: UseDiscoverBooksOptions = {}): UseD
         isFetchingRef.current = false;
       }
     },
-    [listId]
+    [listId, localBooks]
   );
 
   useEffect(() => {

@@ -9,21 +9,32 @@ import { SwipeableBookCard, SwipeableBookCardHandle } from '@/components/discove
 import { AppButton } from '@/components/ui/app-button';
 import { Fonts } from '@/constants/theme';
 import { useDiscoverBooks } from '@/hooks/use-discover-books';
-import type { SwipeDirection } from '@/types/book';
+import { useUserLists } from '@/hooks/use-user-lists';
+import type { Book, SwipeDirection } from '@/types/book';
 
 type DiscoverParams = {
   listId?: string;
   listName?: string;
+  userListId?: string;
 };
 
-export default function DiscoverScreen() {
-  const { listId: listIdParam, listName: listNameParam } = useLocalSearchParams<DiscoverParams>();
+type DiscoverContentProps = {
+  title: string;
+  caption?: string;
+  isListMode: boolean;
+  apiListId?: number;
+  localBooks?: Book[];
+};
 
-  const listId = listIdParam ? Number(listIdParam) : undefined;
-  const hasList = typeof listId === 'number' && Number.isFinite(listId);
-
+function DiscoverContent({
+  title,
+  caption,
+  isListMode,
+  apiListId,
+  localBooks,
+}: DiscoverContentProps) {
   const { current, status, error, hasMore, likedBooks, sourceEmpty, swipe, retry } =
-    useDiscoverBooks({ listId: hasList ? listId : undefined });
+    useDiscoverBooks({ listId: apiListId, books: localBooks });
   const cardRef = useRef<SwipeableBookCardHandle>(null);
   const pendingRef = useRef(false);
   const isDark = useColorScheme() === 'dark';
@@ -100,7 +111,7 @@ export default function DiscoverScreen() {
         <View className="items-center gap-4">
           <ActivityIndicator color="#C0562F" />
           <Text className="text-sm font-medium text-taupe dark:text-fog">
-            {hasList ? 'Loading list…' : 'Finding books for you…'}
+            {isListMode ? 'Loading list…' : 'Finding books for you…'}
           </Text>
         </View>
       );
@@ -109,15 +120,13 @@ export default function DiscoverScreen() {
     return (
       <View className="w-full max-w-actions items-center gap-5 self-center">
         <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
-          {hasList ? "You've seen them all" : "You're all caught up"}
+          {isListMode ? "You've seen them all" : "You're all caught up"}
         </Text>
         <Text className="text-center text-sm text-taupe dark:text-fog">
-          {hasList
-            ? 'You have reached the end of this list.'
-            : 'You’ve seen every book for now.'}
+          {isListMode ? 'You have reached the end of this list.' : 'You’ve seen every book for now.'}
         </Text>
         <AppButton
-          label={hasList ? 'Start over from the top' : 'Start over'}
+          label={isListMode ? 'Start over from the top' : 'Start over'}
           onPress={retry}
           variant="secondary"
         />
@@ -142,7 +151,7 @@ export default function DiscoverScreen() {
             numberOfLines={1}
             ellipsizeMode="tail"
             className="flex-1 px-2 text-center text-2xl font-bold text-ink dark:text-haze">
-            {hasList ? 'Picking books' : 'All Books'}
+            {title}
           </Text>
 
           <View
@@ -154,9 +163,9 @@ export default function DiscoverScreen() {
         </View>
 
         <View className="flex-1 justify-center gap-3 py-2">
-          {hasList && listNameParam ? (
+          {caption ? (
             <Text className="w-full px-1 text-center text-sm font-semibold text-taupe dark:text-fog">
-              {listNameParam}
+              {caption}
             </Text>
           ) : null}
           <View className="w-full max-w-card flex-1 self-center">{renderBody()}</View>
@@ -171,5 +180,61 @@ export default function DiscoverScreen() {
         </View>
       </SafeAreaView>
     </View>
+  );
+}
+
+export default function DiscoverScreen() {
+  const { listId: listIdParam, listName, userListId } = useLocalSearchParams<DiscoverParams>();
+  const { lists: userLists, loaded } = useUserLists();
+
+  const apiListId = listIdParam ? Number(listIdParam) : undefined;
+  const hasApiList = typeof apiListId === 'number' && Number.isFinite(apiListId);
+  const hasUserList = typeof userListId === 'string' && userListId.length > 0;
+
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/lists');
+    }
+  }, []);
+
+  if (hasUserList && !loaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-paper dark:bg-night">
+        <ActivityIndicator color="#C0562F" />
+      </View>
+    );
+  }
+
+  if (hasUserList && !userLists.some((list) => list.id === userListId)) {
+    return (
+      <View className="flex-1 items-center justify-center gap-5 bg-paper dark:bg-night px-6">
+        <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
+          List not found
+        </Text>
+        <Text className="text-center text-sm text-taupe dark:text-fog">
+          This list may have been deleted.
+        </Text>
+        <AppButton label="Pick another list" onPress={goBack} />
+      </View>
+    );
+  }
+
+  const localBooks = hasUserList
+    ? userLists.find((list) => list.id === userListId)?.books
+    : undefined;
+
+  const isListMode = hasApiList || hasUserList;
+
+  return (
+    <DiscoverContent
+      key={userListId ?? (hasApiList ? String(apiListId) : 'all')}
+      title={isListMode ? 'Picking books' : 'All Books'}
+      caption={isListMode ? listName : undefined}
+      isListMode={isListMode}
+      apiListId={hasApiList ? apiListId : undefined}
+      localBooks={localBooks}
+    />
   );
 }
