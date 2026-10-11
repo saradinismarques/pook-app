@@ -368,6 +368,78 @@ export async function fetchListBooks(
     .filter(isBook);
 }
 
+const PREVIEW_BOOK_FIELDS = `
+  id
+  title
+  subtitle
+  image { url }
+`;
+
+const PREVIEW_BATCH_SIZE = 6;
+const listPreviewCache = new Map<number, Book[]>();
+
+async function fetchPreviewChunk(
+  chunk: number[],
+  booksPerList: number
+): Promise<void> {
+  const aliases = chunk
+    .map(
+      (id, index) =>
+        `q${index}: list_books(where: { list_id: { _eq: ${id} } }, order_by: [{ position: asc }, { id: asc }], limit: ${booksPerList}) { book { ${PREVIEW_BOOK_FIELDS} } }`
+    )
+    .join(' ');
+
+  const query = `query ListPreviews { ${aliases} }`;
+
+  let data: Record<string, HardcoverListBook[]>;
+  try {
+    data = await graphqlRequest<Record<string, HardcoverListBook[]>>(query, {});
+  } catch (caught) {
+    if (caught instanceof HardcoverError && caught.code === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      data = await graphqlRequest<Record<string, HardcoverListBook[]>>(query, {});
+    } else {
+      throw caught;
+    }
+  }
+
+  chunk.forEach((id, index) => {
+    const rows = data[`q${index}`] ?? [];
+    const books = rows
+      .map((row) => row.book)
+      .filter((book): book is HardcoverBook => Boolean(book))
+      .map(mapBook)
+      .filter(isBook);
+    listPreviewCache.set(id, books);
+  });
+}
+
+export async function fetchListPreviews(
+  listIds: number[],
+  booksPerList = 6
+): Promise<Map<number, Book[]>> {
+  const ids = listIds.filter((id) => Number.isFinite(id));
+  const missing = ids.filter((id) => !listPreviewCache.has(id));
+
+  for (let i = 0; i < missing.length; i += PREVIEW_BATCH_SIZE) {
+    const chunk = missing.slice(i, i + PREVIEW_BATCH_SIZE);
+    try {
+      await fetchPreviewChunk(chunk, booksPerList);
+    } catch {
+      // leave uncached ids as placeholders; other chunks still succeed
+    }
+  }
+
+  const result = new Map<number, Book[]>();
+  for (const id of ids) {
+    const cached = listPreviewCache.get(id);
+    if (cached) {
+      result.set(id, cached);
+    }
+  }
+  return result;
+}
+
 export type SearchListsOptions = {
   query: string;
   page?: number;

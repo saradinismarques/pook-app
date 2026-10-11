@@ -1,29 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, useColorScheme, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  useColorScheme,
+  View,
+  ViewToken,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ListPreviewCard } from '@/components/lists/list-preview-card';
 import { ListRow } from '@/components/lists/list-row';
 import { ListSearchBar } from '@/components/lists/list-search-bar';
 import { AppButton } from '@/components/ui/app-button';
 import { Fonts } from '@/constants/theme';
 import { useBookLists } from '@/hooks/use-book-lists';
 import { useUserLists } from '@/hooks/use-user-lists';
+import { fetchListPreviews, fetchPopularBooks } from '@/lib/hardcover';
+import type { Book } from '@/types/book';
 import type { BookList, UserList } from '@/types/list';
 
 const SEARCH_DEBOUNCE_MS = 350;
-
-function formatListMeta(list: BookList): string {
-  const parts = [`${list.booksCount.toLocaleString()} books`];
-  if (list.likesCount > 0) {
-    parts.push(`${list.likesCount.toLocaleString()} likes`);
-  }
-  if (list.owner) {
-    parts.push(`by @${list.owner}`);
-  }
-  return parts.join(' · ');
-}
+const PREVIEW_COUNT = 6;
 
 export default function ListsScreen() {
   const [search, setSearch] = useState('');
@@ -35,6 +36,10 @@ export default function ListsScreen() {
   const { lists: userLists } = useUserLists();
   const isDark = useColorScheme() === 'dark';
 
+  const [previews, setPreviews] = useState<Record<number, Book[]>>({});
+  const [allBooksPreview, setAllBooksPreview] = useState<Book[] | null>(null);
+  const requestedPreviewIds = useRef<Set<number>>(new Set());
+
   const isSearching = debouncedSearch.trim().length > 0;
 
   useEffect(() => {
@@ -44,6 +49,58 @@ export default function ListsScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (allBooksPreview !== null) {
+      return;
+    }
+    const controller = new AbortController();
+    fetchPopularBooks({ limit: PREVIEW_COUNT }, controller.signal)
+      .then(setAllBooksPreview)
+      .catch(() => setAllBooksPreview([]));
+    return () => controller.abort();
+  }, [allBooksPreview]);
+
+  const ensurePreviews = useCallback((listIds: number[]) => {
+    const missing = listIds.filter((id) => !requestedPreviewIds.current.has(id));
+    if (missing.length === 0) {
+      return;
+    }
+    missing.forEach((id) => requestedPreviewIds.current.add(id));
+    fetchListPreviews(missing, PREVIEW_COUNT)
+      .then((fetched) => {
+        if (fetched.size === 0) {
+          return;
+        }
+        const update: Record<number, Book[]> = {};
+        fetched.forEach((books, id) => {
+          update[id] = books;
+        });
+        setPreviews((prev) => ({ ...prev, ...update }));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    ensurePreviews(lists.slice(0, PREVIEW_COUNT).map((list) => list.id));
+  }, [lists, ensurePreviews]);
+
+  const [viewabilityConfig] = useState({ itemVisiblePercentThreshold: 40 });
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const ids: number[] = [];
+      for (const token of viewableItems) {
+        if (token.item && typeof token.item === 'object' && 'id' in token.item) {
+          const id = (token.item as { id: unknown }).id;
+          if (typeof id === 'number') {
+            ids.push(id);
+          }
+        }
+      }
+      ensurePreviews(ids);
+    },
+    [ensurePreviews]
+  );
 
   const handleSearchChange = useCallback((text: string) => {
     setSearch(text);
@@ -108,11 +165,10 @@ export default function ListsScreen() {
           Your lists · {userLists.length}
         </Text>
         {userLists.map((list) => (
-          <ListRow
+          <ListPreviewCard
             key={list.id}
             name={list.name}
-            meta={`${list.books.length} ${list.books.length === 1 ? 'book' : 'books'}`}
-            icon="bookmark-outline"
+            books={list.books}
             onPress={() => handleUserList(list)}
             onEdit={() => handleEditUserList(list)}
           />
@@ -126,16 +182,15 @@ export default function ListsScreen() {
       {!isSearching ? (
         <View className="gap-3 pb-4">
           <ListRow
-            name="All Books"
-            meta="Swipe every popular book"
-            icon="library-outline"
-            onPress={handleAllBooks}
-          />
-          <ListRow
             name="Create a list"
             meta="Search books and build your own"
             icon="add-circle-outline"
             onPress={handleCreateList}
+          />
+          <ListPreviewCard
+            name="All Books"
+            books={allBooksPreview ?? undefined}
+            onPress={handleAllBooks}
           />
         </View>
       ) : null}
@@ -245,11 +300,9 @@ export default function ListsScreen() {
         keyExtractor={(item) => String(item.id)}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
-          <ListRow
+          <ListPreviewCard
             name={item.name}
-            meta={formatListMeta(item)}
-            description={item.description}
-            featured={item.featured}
+            books={previews[item.id]}
             onPress={() => handlePublicList(item)}
           />
         )}
@@ -258,6 +311,8 @@ export default function ListsScreen() {
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         ListHeaderComponent={renderListHeader}
         ListFooterComponent={renderFooter}
       />
