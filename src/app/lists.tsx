@@ -12,13 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BookPickRow } from '@/components/lists/book-pick-row';
 import { ListPreviewCard } from '@/components/lists/list-preview-card';
 import { ListRow } from '@/components/lists/list-row';
 import { ListSearchBar } from '@/components/lists/list-search-bar';
 import { AppButton } from '@/components/ui/app-button';
 import { Fonts } from '@/constants/theme';
 import { useBookLists } from '@/hooks/use-book-lists';
+import { useBookSearch } from '@/hooks/use-book-search';
+import { useLikedBooks } from '@/hooks/use-liked-books';
 import { useUserLists } from '@/hooks/use-user-lists';
+import { addLikedBook } from '@/lib/liked-books';
 import { fetchListPreviews, fetchPopularBooks } from '@/lib/hardcover';
 import type { Book } from '@/types/book';
 import type { BookList, UserList } from '@/types/list';
@@ -34,7 +38,16 @@ export default function ListsScreen() {
   const { lists, total, status, loadingMore, error, hasMore, loadMore, retry } =
     useBookLists(debouncedSearch);
   const { lists: userLists } = useUserLists();
+  const {
+    books: searchResults,
+    total: bookTotal,
+    status: bookSearchStatus,
+    error: bookSearchError,
+  } = useBookSearch(debouncedSearch);
+  const { books: likedBooks } = useLikedBooks();
   const isDark = useColorScheme() === 'dark';
+
+  const likedIds = new Set(likedBooks.map((book) => book.id));
 
   const [previews, setPreviews] = useState<Record<number, Book[]>>({});
   const [allBooksPreview, setAllBooksPreview] = useState<Book[] | null>(null);
@@ -101,6 +114,10 @@ export default function ListsScreen() {
     },
     [ensurePreviews]
   );
+
+  const handleAddToMyBooks = useCallback((book: Book) => {
+    void addLikedBook(book).catch(() => {});
+  }, []);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearch(text);
@@ -177,8 +194,73 @@ export default function ListsScreen() {
     );
   };
 
+  const renderBookResults = () => {
+    if (!isSearching) {
+      return null;
+    }
+
+    if (bookSearchStatus === 'loading') {
+      return (
+        <View className="gap-3 pb-5">
+          <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+            Books
+          </Text>
+          <View className="flex-row items-center gap-3">
+            <ActivityIndicator color="#C0562F" />
+            <Text className="text-sm font-medium text-taupe dark:text-fog">
+              Searching books…
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (bookSearchStatus === 'error') {
+      return (
+        <View className="gap-2 pb-5">
+          <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+            Books
+          </Text>
+          <Text className="text-sm text-taupe dark:text-fog">
+            {bookSearchError ?? 'Couldn’t search books. Try again in a moment.'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (searchResults.length === 0) {
+      return (
+        <View className="gap-2 pb-5">
+          <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+            Books
+          </Text>
+          <Text className="text-sm text-taupe dark:text-fog">No books match your search.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View className="gap-3 pb-5">
+        <Text className="text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
+          Books · {bookTotal > 0 ? bookTotal.toLocaleString() : searchResults.length}
+        </Text>
+        {searchResults.map((book) => (
+          <BookPickRow
+            key={book.id}
+            book={book}
+            action="add"
+            added={likedIds.has(book.id)}
+            onPress={() => handleAddToMyBooks(book)}
+          />
+        ))}
+      </View>
+    );
+  };
+
   const renderListHeader = () => (
     <View>
+      {renderBookResults()}
+
       {!isSearching ? (
         <View className="gap-3 pb-4">
           <ListRow
@@ -199,13 +281,17 @@ export default function ListsScreen() {
 
       <Text className="pb-3 text-[11px] font-bold uppercase tracking-wide text-taupe dark:text-fog">
         {isSearching
-          ? `Results${total > 0 ? ` · ${total.toLocaleString()}` : ''}`
+          ? `Lists${total > 0 ? ` · ${total.toLocaleString()}` : ''}`
           : `Public lists${total > 0 ? ` · ${total.toLocaleString()}` : ''}`}
       </Text>
     </View>
   );
 
   const renderFooter = () => {
+    if (isSearching && lists.length === 0) {
+      return null;
+    }
+
     if (loadingMore) {
       return (
         <View className="items-center py-4">
@@ -241,13 +327,80 @@ export default function ListsScreen() {
     );
   };
 
+  const renderSearchListsState = () => {
+    if (status === 'loading') {
+      return (
+        <View className="flex-row items-center gap-3 pb-3">
+          <ActivityIndicator color="#C0562F" />
+          <Text className="text-sm font-medium text-taupe dark:text-fog">Searching lists…</Text>
+        </View>
+      );
+    }
+
+    if (status === 'error') {
+      return (
+        <View className="gap-2 pb-3">
+          <Text className="text-sm text-ink dark:text-haze">Couldn’t search lists</Text>
+          <Text className="text-sm text-taupe dark:text-fog">
+            {error ?? 'Something went wrong. Please try again.'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (lists.length === 0) {
+      return (
+        <View className="gap-1 pb-3">
+          <Text className="text-sm text-ink dark:text-haze">No lists match your search</Text>
+          <Text className="text-sm text-taupe dark:text-fog">
+            Try a different search.
+          </Text>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
   const renderBody = () => {
+    if (isSearching) {
+      return (
+        <FlatList
+          className="flex-1"
+          data={lists}
+          keyExtractor={(item) => String(item.id)}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => (
+            <ListPreviewCard
+              name={item.name}
+              books={previews[item.id]}
+              onPress={() => handlePublicList(item)}
+            />
+          )}
+          ItemSeparatorComponent={() => <View className="h-3" />}
+          contentContainerStyle={{ paddingBottom: 16 }}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          ListHeaderComponent={
+            <View>
+              {renderListHeader()}
+              {renderSearchListsState()}
+            </View>
+          }
+          ListFooterComponent={renderFooter}
+        />
+      );
+    }
+
     if (status === 'loading') {
       return (
         <View className="flex-1 items-center justify-center gap-4">
           <ActivityIndicator color="#C0562F" />
           <Text className="text-sm font-medium text-taupe dark:text-fog">
-            {isSearching ? 'Searching lists…' : 'Finding lists for you…'}
+            Finding lists for you…
           </Text>
         </View>
       );
@@ -257,15 +410,12 @@ export default function ListsScreen() {
       return (
         <View className="flex-1 items-center justify-center gap-5">
           <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
-            {isSearching ? 'Search failed' : 'Couldn’t load lists'}
+            Couldn’t load lists
           </Text>
           <Text className="text-center text-sm text-taupe dark:text-fog">
             {error ?? 'Something went wrong. Please try again.'}
           </Text>
-          <AppButton
-            label={isSearching ? 'Clear search' : 'Try again'}
-            onPress={isSearching ? handleSearchClear : retry}
-          />
+          <AppButton label="Try again" onPress={retry} />
         </View>
       );
     }
@@ -276,18 +426,12 @@ export default function ListsScreen() {
           {renderListHeader()}
           <View className="flex-1 items-center justify-center gap-4">
             <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
-              {isSearching ? 'No lists match your search' : 'No public lists right now'}
+              No public lists right now
             </Text>
             <Text className="text-center text-sm text-taupe dark:text-fog">
-              {isSearching
-                ? `Nothing found for “${debouncedSearch.trim()}”. Try a different search.`
-                : 'New lists show up here.'}
+              New lists show up here.
             </Text>
-            <AppButton
-              label={isSearching ? 'Clear search' : 'Try again'}
-              variant="secondary"
-              onPress={isSearching ? handleSearchClear : retry}
-            />
+            <AppButton label="Try again" variant="secondary" onPress={retry} />
           </View>
         </View>
       );

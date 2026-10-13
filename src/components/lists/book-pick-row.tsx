@@ -62,7 +62,7 @@ export function BookPickRow({ book, action, added = false, onPress }: BookPickRo
           isRemove ? 'bg-edge dark:bg-edge-dark' : 'bg-ember dark:bg-flame'
         }`}>
         <Ionicons
-          name={added ? 'checkmark' : isRemove ? 'close' : 'add'}
+          name={added ? 'checkmark' : isRemove ? 'close' : 'heart'}
           size={20}
           color={isRemove ? '#7C6B5A' : '#FFFFFF'}
         />

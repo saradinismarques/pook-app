@@ -13,8 +13,8 @@ export function ListSearchBar({
   value,
   onChangeText,
   onClear,
-  placeholder = 'Search public lists',
-  accessibilityLabel = 'Search lists',
+  placeholder = 'Search books and lists',
+  accessibilityLabel = 'Search books and lists',
 }: ListSearchBarProps) {
   return (
     <View className="flex-row items-center gap-2 rounded-full bg-edge px-4 py-3 dark:bg-edge-dark">
