@@ -29,14 +29,25 @@ import type { BookList, UserList } from '@/types/list';
 
 const SEARCH_DEBOUNCE_MS = 350;
 const PREVIEW_COUNT = 6;
+const PREVIEW_RETRY_MS = 3000;
 
 export default function ListsScreen() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { lists, total, status, loadingMore, error, hasMore, loadMore, retry } =
-    useBookLists(debouncedSearch);
+  const {
+    lists,
+    total,
+    status,
+    loadingMore,
+    error,
+    loadMoreError,
+    hasMore,
+    loadMore,
+    retryLoadMore,
+    retry,
+  } = useBookLists(debouncedSearch);
   const { lists: userLists } = useUserLists();
   const {
     books: searchResults,
@@ -52,6 +63,7 @@ export default function ListsScreen() {
   const [previews, setPreviews] = useState<Record<number, Book[]>>({});
   const [allBooksPreview, setAllBooksPreview] = useState<Book[] | null>(null);
   const requestedPreviewIds = useRef<Set<number>>(new Set());
+  const ensurePreviewsRef = useRef<(listIds: number[]) => void>(() => {});
 
   const isSearching = debouncedSearch.trim().length > 0;
 
@@ -81,18 +93,33 @@ export default function ListsScreen() {
     }
     missing.forEach((id) => requestedPreviewIds.current.add(id));
     fetchListPreviews(missing, PREVIEW_COUNT)
-      .then((fetched) => {
-        if (fetched.size === 0) {
+      .then(({ books, failedIds }) => {
+        if (failedIds.length > 0) {
+          failedIds.forEach((id) => requestedPreviewIds.current.delete(id));
+          setTimeout(() => {
+            ensurePreviewsRef.current(failedIds);
+          }, PREVIEW_RETRY_MS);
+        }
+        if (books.size === 0) {
           return;
         }
         const update: Record<number, Book[]> = {};
-        fetched.forEach((books, id) => {
-          update[id] = books;
+        books.forEach((previewBooks, id) => {
+          update[id] = previewBooks;
         });
         setPreviews((prev) => ({ ...prev, ...update }));
       })
-      .catch(() => {});
+      .catch(() => {
+        missing.forEach((id) => requestedPreviewIds.current.delete(id));
+        setTimeout(() => {
+          ensurePreviewsRef.current(missing);
+        }, PREVIEW_RETRY_MS);
+      });
   }, []);
+
+  useEffect(() => {
+    ensurePreviewsRef.current = ensurePreviews;
+  }, [ensurePreviews]);
 
   useEffect(() => {
     ensurePreviews(lists.slice(0, PREVIEW_COUNT).map((list) => list.id));
@@ -296,6 +323,27 @@ export default function ListsScreen() {
       return (
         <View className="items-center py-4">
           <ActivityIndicator color="#C0562F" />
+        </View>
+      );
+    }
+
+    if (loadMoreError) {
+      return (
+        <View className="items-center gap-2 py-4">
+          <Text className="text-sm text-taupe dark:text-fog">
+            Couldn’t load more lists. You’ve reached what we can load right now.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading more lists"
+            onPress={retryLoadMore}
+            className="min-h-button items-center justify-center rounded-full border border-edge bg-sand px-6 py-3 active:opacity-80 dark:border-edge-dark dark:bg-coal">
+            <Text
+              style={{ fontFamily: Fonts.rounded }}
+              className="text-button font-semibold text-ink dark:text-haze">
+              Try again
+            </Text>
+          </Pressable>
         </View>
       );
     }

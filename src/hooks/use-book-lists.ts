@@ -22,8 +22,10 @@ export type UseBookListsResult = {
   status: BookListsStatus;
   loadingMore: boolean;
   error: string | null;
+  loadMoreError: string | null;
   hasMore: boolean;
   loadMore: () => void;
+  retryLoadMore: () => void;
   retry: () => void;
 };
 
@@ -39,6 +41,7 @@ export function useBookLists(searchInput: string): UseBookListsResult {
     error: null,
   }));
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const seenIds = useRef<Set<number>>(new Set());
   const isFetchingRef = useRef(false);
@@ -98,6 +101,7 @@ export function useBookLists(searchInput: string): UseBookListsResult {
           status: 'ready',
           error: null,
         }));
+        setLoadMoreError(null);
       } catch (caught) {
         if (caught instanceof Error && caught.name === 'AbortError') {
           return;
@@ -105,11 +109,20 @@ export function useBookLists(searchInput: string): UseBookListsResult {
         if (!mounted.current || generation !== generationRef.current) {
           return;
         }
-        setState((prev) => ({
-          ...prev,
-          status: 'error',
-          error: caught instanceof Error ? caught.message : 'Something went wrong.',
-        }));
+        const message = caught instanceof Error ? caught.message : 'Something went wrong.';
+        if (mode === 'more') {
+          setState((prev) => ({
+            ...prev,
+            hasMore: false,
+          }));
+          setLoadMoreError(message);
+        } else {
+          setState((prev) => ({
+            ...prev,
+            status: 'error',
+            error: message,
+          }));
+        }
       } finally {
         if (generation === generationRef.current) {
           isFetchingRef.current = false;
@@ -135,6 +148,7 @@ export function useBookLists(searchInput: string): UseBookListsResult {
   const hasMore = isStale ? false : state.hasMore;
   const status: BookListsStatus = isStale ? 'loading' : state.status;
   const error = isStale ? null : state.error;
+  const loadMoreErrorState = isStale ? null : loadMoreError;
 
   const loadMore = useCallback(() => {
     if (isFetchingRef.current || !hasMore) {
@@ -144,8 +158,19 @@ export function useBookLists(searchInput: string): UseBookListsResult {
     void load('more');
   }, [load, hasMore]);
 
+  const retryLoadMore = useCallback(() => {
+    if (isFetchingRef.current) {
+      return;
+    }
+    setLoadMoreError(null);
+    setState((prev) => ({ ...prev, hasMore: true }));
+    setLoadingMore(true);
+    void load('more');
+  }, [load]);
+
   const retry = useCallback(() => {
     generationRef.current += 1;
+    setLoadMoreError(null);
     setState((prev) => ({ ...prev, status: 'loading', error: null }));
     void load('initial');
   }, [load]);
@@ -156,8 +181,10 @@ export function useBookLists(searchInput: string): UseBookListsResult {
     status,
     loadingMore,
     error,
+    loadMoreError: loadMoreErrorState,
     hasMore,
     loadMore,
+    retryLoadMore,
     retry,
   };
 }

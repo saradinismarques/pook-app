@@ -154,12 +154,13 @@ describe('fetchListPreviews', () => {
 
     const first = await fetchListPreviews(ids, 6);
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(first.size).toBe(7);
+    expect(first.books.size).toBe(7);
+    expect(first.failedIds).toEqual([]);
 
     mockFetch.mockClear();
     const second = await fetchListPreviews(ids, 6);
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(second.get(11)).toHaveLength(1);
+    expect(second.books.get(11)).toHaveLength(1);
   });
 
   it('retries once after a rate limit', async () => {
@@ -174,15 +175,16 @@ describe('fetchListPreviews', () => {
       const result = await promise;
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(result.get(21)?.[0]?.title).toBe('Retry Book');
+      expect(result.books.get(21)?.[0]?.title).toBe('Retry Book');
     } finally {
       jest.useRealTimers();
     }
   });
 
-  it('leaves failed chunks out of the result without failing the call', async () => {
+  it('leaves failed chunks out of the result and reports their ids', async () => {
     mockFetch.mockRejectedValueOnce(new TypeError('Network request failed'));
     const result = await fetchListPreviews([31], 6);
-    expect(result.size).toBe(0);
+    expect(result.books.size).toBe(0);
+    expect(result.failedIds).toEqual([31]);
   });
 });

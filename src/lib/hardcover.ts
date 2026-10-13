@@ -423,16 +423,17 @@ async function fetchPreviewChunk(
 export async function fetchListPreviews(
   listIds: number[],
   booksPerList = 6
-): Promise<Map<number, Book[]>> {
+): Promise<{ books: Map<number, Book[]>; failedIds: number[] }> {
   const ids = listIds.filter((id) => Number.isFinite(id));
   const missing = ids.filter((id) => !listPreviewCache.has(id));
+  const failedIds: number[] = [];
 
   for (let i = 0; i < missing.length; i += PREVIEW_BATCH_SIZE) {
     const chunk = missing.slice(i, i + PREVIEW_BATCH_SIZE);
     try {
       await fetchPreviewChunk(chunk, booksPerList);
     } catch {
-      // leave uncached ids as placeholders; other chunks still succeed
+      failedIds.push(...chunk);
     }
   }
 
@@ -443,7 +444,7 @@ export async function fetchListPreviews(
       result.set(id, cached);
     }
   }
-  return result;
+  return { books: result, failedIds };
 }
 
 export type SearchListsOptions = {
