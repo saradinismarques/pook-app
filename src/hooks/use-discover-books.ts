@@ -8,6 +8,15 @@ const LOW_WATER_MARK = 4;
 const MAX_EMPTY_BATCHES = 3;
 const LIST_BATCH_SIZE = 20;
 
+function shuffle<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export type DiscoverStatus = 'loading' | 'ready' | 'error';
 
 export type UseDiscoverBooksOptions = {
@@ -75,7 +84,8 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
           listOffset.current += incoming.length;
         }
 
-        const fresh = incoming.filter((book) => !seenIds.current.has(book.id));
+        const batch = shuffle(incoming);
+        const fresh = batch.filter((book) => !seenIds.current.has(book.id));
         fresh.forEach((book) => seenIds.current.add(book.id));
 
         emptyBatches.current = fresh.length === 0 ? emptyBatches.current + 1 : 0;
