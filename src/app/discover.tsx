@@ -11,7 +11,6 @@ import { Fonts } from '@/constants/theme';
 import { useDiscoverBooks } from '@/hooks/use-discover-books';
 import { useUserLists } from '@/hooks/use-user-lists';
 import type { Book, SwipeDirection } from '@/types/book';
-
 type DiscoverParams = {
   listId?: string;
   listName?: string;
@@ -69,12 +68,7 @@ function DiscoverContent({
   const renderBody = () => {
     if (current) {
       return (
-        <SwipeableBookCard
-          key={current.id}
-          ref={cardRef}
-          book={current}
-          onSwiped={handleSwiped}
-        />
+        <SwipeableBookCard key={current.id} ref={cardRef} book={current} onSwiped={handleSwiped} />
       );
     }
 

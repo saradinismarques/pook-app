@@ -6,6 +6,8 @@ export type Book = {
   thumbnail?: string;
   publishedDate?: string;
   pageCount?: number;
+  rating?: number;
+  usersCount?: number;
   categories: string[];
 };
 

@@ -13,6 +13,8 @@ const BOOK_FIELDS = `
   description
   pages
   release_date
+  rating
+  users_count
   image { url }
   contributions { author { name } }
 `;
@@ -110,6 +112,8 @@ type HardcoverBook = {
   description?: string;
   pages?: number;
   release_date?: string;
+  rating?: number;
+  users_count?: number;
   image?: { url?: string } | null;
   contributions?: HardcoverContribution[];
 };
@@ -264,12 +268,14 @@ function mapBook(book: HardcoverBook): Book | null {
 
   return {
     id: String(book.id),
-    title: book.subtitle ? `${title}: ${book.subtitle}` : title,
+    title: book.subtitle ? `${title}: ${book.subtitle.trim()}` : title,
     authors: authors.length ? authors : ['Unknown author'],
     description: cleanDescription(book.description),
     thumbnail: book.image?.url,
     publishedDate: book.release_date,
     pageCount: book.pages,
+    rating: typeof book.rating === 'number' ? Math.round(book.rating * 10) / 10 : undefined,
+    usersCount: book.users_count,
     categories: [],
   };
 }

@@ -26,19 +26,16 @@ function CoverPlaceholder() {
 }
 
 function Cover({ book }: { book: Book }) {
-  if (book.thumbnail) {
-    return (
-      <Image
-        source={{ uri: book.thumbnail }}
-        contentFit="cover"
-        transition={200}
-        style={{ width: COVER_W, height: COVER_H }}
-        className="rounded-md bg-edge dark:bg-edge-dark"
-      />
-    );
-  }
-
-  return (
+  return book.thumbnail ? (
+    <Image
+      source={{ uri: book.thumbnail }}
+      contentFit="cover"
+      transition={200}
+      style={{ width: COVER_W, height: COVER_H }}
+      className="rounded-md bg-edge dark:bg-edge-dark"
+      accessibilityLabel={`Cover of ${book.title}`}
+    />
+  ) : (
     <View
       style={{ width: COVER_W, height: COVER_H }}
       className="items-center justify-center rounded-md bg-edge dark:bg-edge-dark">

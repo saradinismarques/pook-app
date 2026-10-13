@@ -5,16 +5,19 @@ import { Fonts } from '@/constants/theme';
 import { shortenDescription } from '@/lib/text';
 import type { Book } from '@/types/book';
 
+const DESCRIPTION_MAX_LENGTH = 110;
+
 export type BookCardProps = {
   book: Book;
+  onShowMore?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
-export function BookCard({ book, style }: BookCardProps) {
-  const description = shortenDescription(book.description);
-  const meta = [book.publishedDate?.slice(0, 4), book.pageCount ? `${book.pageCount} pages` : null]
-    .filter(Boolean)
-    .join(' · ');
+export function BookCard({ book, onShowMore, style }: BookCardProps) {
+  const description = shortenDescription(book.description, DESCRIPTION_MAX_LENGTH);
+  const year = book.publishedDate?.slice(0, 4);
+  const byline = [book.authors.join(', '), year].filter(Boolean).join(' · ');
+  const showMore = Boolean(onShowMore) && Boolean(description?.endsWith('…'));
 
   return (
     <View
@@ -43,24 +46,36 @@ export function BookCard({ book, style }: BookCardProps) {
         )}
       </View>
 
-      <View className="gap-2 p-4 shrink-0">
+      <View className="gap-1.5 p-4 shrink-0">
         <Text
           numberOfLines={1}
           style={{ fontFamily: Fonts.serif }}
           className="text-lg font-bold text-ink dark:text-haze">
           {book.title}
         </Text>
-        <Text numberOfLines={1} className="text-xs font-semibold text-taupe dark:text-fog">
-          {book.authors.join(', ')}
-        </Text>
-        {meta ? (
-          <Text className="text-[10px] uppercase tracking-wide text-taupe/80 dark:text-fog/70">
-            {meta}
+        {byline ? (
+          <Text numberOfLines={1} className="text-xs font-semibold text-taupe dark:text-fog">
+            {byline}
           </Text>
         ) : null}
-        <Text numberOfLines={2} className="text-xs text-taupe dark:text-fog">
-          {description ?? 'No description available for this book.'}
-        </Text>
+        {description ? (
+          <Text className="text-sm leading-5 text-taupe dark:text-fog">
+            {description}
+            {showMore ? (
+              <Text
+                accessibilityRole="link"
+                accessibilityLabel="Show more"
+                onPress={onShowMore}
+                className="font-semibold text-ember underline">
+                {' Show more'}
+              </Text>
+            ) : null}
+          </Text>
+        ) : (
+          <Text className="text-sm leading-5 text-taupe dark:text-fog">
+            No description available for this book.
+          </Text>
+        )}
       </View>
     </View>
   );

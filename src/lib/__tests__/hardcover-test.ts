@@ -18,6 +18,8 @@ function graphQlBook(id: number, title: string) {
     description: 'A book.',
     pages: 100,
     release_date: '2000-01-01',
+    rating: 4.334035656401945,
+    users_count: 14537,
     image: { url: `https://example.com/${id}.jpg` },
     contributions: [{ author: { name: 'Author' } }],
   };
