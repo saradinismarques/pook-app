@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { addLikedBook } from '@/lib/liked-books';
 import { fetchBookBatch, fetchListBooks } from '@/lib/hardcover';
 import type { Book, SwipeDirection } from '@/types/book';
 
@@ -132,6 +133,7 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
         setLikedBooks((prev) =>
           prev.some((liked) => liked.id === book.id) ? prev : [...prev, book]
         );
+        void addLikedBook(book).catch(() => {});
       }
       const nextIndex = index + 1;
       setIndex(nextIndex);

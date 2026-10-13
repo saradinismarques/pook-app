@@ -10,7 +10,9 @@ export default function HomeScreen() {
   const handlePickBooks = () => {
     router.push('/lists');
   };
-  const handleMyBooks = () => {};
+  const handleMyBooks = () => {
+    router.push('/my-books');
+  };
 
   return (
     <View className="flex-1 flex-row justify-center bg-paper dark:bg-night">
