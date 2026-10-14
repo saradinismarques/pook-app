@@ -130,7 +130,7 @@ function DiscoverContent({
     }
 
     return (
-      <View className="w-full max-w-actions items-center gap-5 self-center">
+      <View className="w-full max-w-actions flex-1 items-center justify-center gap-5 self-center">
         <Text className="text-center text-tagline font-medium text-ink dark:text-haze">
           {isListMode ? "You've seen them all" : "You're all caught up"}
         </Text>
@@ -138,8 +138,8 @@ function DiscoverContent({
           {isListMode ? 'You have reached the end of this list.' : 'You’ve seen every book for now.'}
         </Text>
         <AppButton
-          label={isListMode ? 'Start over from the top' : 'Start over'}
-          onPress={retry}
+          label={isListMode ? 'Return to lists' : 'Start over'}
+          onPress={isListMode ? goBack : retry}
           variant="secondary"
         />
       </View>
@@ -200,10 +200,11 @@ function DiscoverContent({
           <View className="w-full max-w-card flex-1 self-center">{renderBody()}</View>
         </View>
 
-        <View className="pt-2">
+        <View className="w-full max-w-card self-center pt-2">
           <SwipeActions
             onSkip={() => triggerSwipe('left')}
             onLike={() => triggerSwipe('right')}
+            onDone={goBack}
             disabled={!current}
           />
         </View>

@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, useColorScheme, View } from 'react-native';
+import { Pressable, Text, useColorScheme, View } from 'react-native';
+
+import { Fonts } from '@/constants/theme';
 
 export type SwipeActionsProps = {
   onSkip: () => void;
   onLike: () => void;
+  onDone: () => void;
   disabled?: boolean;
 };
 
-export function SwipeActions({ onSkip, onLike, disabled = false }: SwipeActionsProps) {
+export function SwipeActions({ onSkip, onLike, onDone, disabled = false }: SwipeActionsProps) {
   const isDark = useColorScheme() === 'dark';
 
   return (
@@ -34,6 +37,18 @@ export function SwipeActions({ onSkip, onLike, disabled = false }: SwipeActionsP
           disabled ? 'opacity-50' : ''
         }`}>
         <Ionicons name="heart" size={28} color={isDark ? '#2B1710' : '#FFFFFF'} />
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Done, go back to lists"
+        onPress={onDone}
+        className="absolute right-0 h-14 items-center justify-center rounded-full border border-ember px-5 active:opacity-80">
+        <Text
+          style={{ fontFamily: Fonts.rounded }}
+          className="text-button font-semibold text-ember">
+          Done
+        </Text>
       </Pressable>
     </View>
   );
