@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useRef } from 'react';
-import { ActivityIndicator, Pressable, Text, useColorScheme, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Pressable, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SwipeActions } from '@/components/discover/swipe-actions';
@@ -37,6 +37,24 @@ function DiscoverContent({
   const cardRef = useRef<SwipeableBookCardHandle>(null);
   const pendingRef = useRef(false);
   const isDark = useColorScheme() === 'dark';
+  const [countScale] = useState(() => new Animated.Value(1));
+  const prevLikedCountRef = useRef(0);
+
+  useEffect(() => {
+    if (likedBooks.length > prevLikedCountRef.current) {
+      countScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(countScale, { toValue: 1.3, duration: 140, useNativeDriver: true }),
+        Animated.spring(countScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 30,
+          bounciness: 14,
+        }),
+      ]).start();
+    }
+    prevLikedCountRef.current = likedBooks.length;
+  }, [likedBooks.length, countScale]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -148,12 +166,13 @@ function DiscoverContent({
             {title}
           </Text>
 
-          <View
+          <Animated.View
             accessibilityLabel={`${likedBooks.length} books liked`}
+            style={{ transform: [{ scale: countScale }] }}
             className="h-10 flex-row items-center gap-1 rounded-full border border-edge bg-sand px-3 dark:border-edge-dark dark:bg-coal">
             <Ionicons name="heart" size={14} color="#C0562F" />
             <Text className="text-sm font-bold text-ink dark:text-haze">{likedBooks.length}</Text>
-          </View>
+          </Animated.View>
         </View>
 
         <View className="flex-1 justify-center gap-3 py-2">
