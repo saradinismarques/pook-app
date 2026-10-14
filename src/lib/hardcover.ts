@@ -374,6 +374,25 @@ export async function fetchListBooks(
     .filter(isBook);
 }
 
+const LIST_BOOK_COUNT_QUERY = `
+  query ListBookCount($listId: Int!) {
+    list_books_aggregate(where: { list_id: { _eq: $listId } }) {
+      aggregate { count }
+    }
+  }
+`;
+
+export async function fetchListBookCount(
+  listId: number,
+  signal?: AbortSignal
+): Promise<number> {
+  const data = await graphqlRequest<{
+    list_books_aggregate?: { aggregate?: { count?: number } };
+  }>(LIST_BOOK_COUNT_QUERY, { listId }, signal);
+
+  return data.list_books_aggregate?.aggregate?.count ?? 0;
+}
+
 const PREVIEW_BOOK_FIELDS = `
   id
   title

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { addLikedBook } from '@/lib/liked-books';
-import { fetchBookBatch, fetchListBooks } from '@/lib/hardcover';
+import { fetchBookBatch, fetchListBookCount, fetchListBooks } from '@/lib/hardcover';
 import type { Book, SwipeDirection } from '@/types/book';
 
 const LOW_WATER_MARK = 4;
@@ -31,6 +31,8 @@ export type UseDiscoverBooksResult = {
   hasMore: boolean;
   likedBooks: Book[];
   sourceEmpty: boolean;
+  total: number | null;
+  seenCount: number;
   swipe: (direction: SwipeDirection) => void;
   retry: () => void;
 };
@@ -43,6 +45,7 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
   const [hasMore, setHasMore] = useState(true);
   const [likedBooks, setLikedBooks] = useState<Book[]>([]);
   const [sourceEmpty, setSourceEmpty] = useState(false);
+  const [listTotal, setListTotal] = useState<number | null>(null);
 
   const seenIds = useRef<Set<string>>(new Set());
   const isFetchingRef = useRef(false);
@@ -66,9 +69,13 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
 
       try {
         let incoming: Book[];
+        let countPromise: Promise<number | null> = Promise.resolve(null);
         if (localBooks) {
           incoming = mode === 'initial' ? localBooks : [];
         } else if (listId !== undefined) {
+          if (mode === 'initial') {
+            countPromise = fetchListBookCount(listId, signal).catch(() => null);
+          }
           incoming = await fetchListBooks(
             { listId, limit: LIST_BATCH_SIZE, offset: listOffset.current },
             signal
@@ -78,6 +85,11 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
         }
         if (!mounted.current) {
           return;
+        }
+
+        const count = await countPromise;
+        if (mounted.current && count !== null) {
+          setListTotal(count);
         }
 
         if (!localBooks && listId !== undefined) {
@@ -163,10 +175,13 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
     setLikedBooks([]);
     setHasMore(true);
     setSourceEmpty(false);
+    setListTotal(null);
     setStatus('loading');
     setError(null);
     void loadBatch('initial');
   }, [loadBatch]);
+
+  const total = localBooks ? localBooks.length : listId !== undefined ? listTotal : null;
 
   return {
     current,
@@ -175,6 +190,8 @@ export function useDiscoverBooks({ listId, books: localBooks }: UseDiscoverBooks
     hasMore,
     likedBooks,
     sourceEmpty,
+    total,
+    seenCount: index,
     swipe,
     retry,
   };

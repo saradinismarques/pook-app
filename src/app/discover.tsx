@@ -32,7 +32,7 @@ function DiscoverContent({
   apiListId,
   localBooks,
 }: DiscoverContentProps) {
-  const { current, status, error, hasMore, likedBooks, sourceEmpty, swipe, retry } =
+  const { current, status, error, hasMore, likedBooks, sourceEmpty, total, seenCount, swipe, retry } =
     useDiscoverBooks({ listId: apiListId, books: localBooks });
   const cardRef = useRef<SwipeableBookCardHandle>(null);
   const pendingRef = useRef(false);
@@ -180,6 +180,22 @@ function DiscoverContent({
             <Text className="w-full px-1 text-center text-sm font-semibold text-taupe dark:text-fog">
               {caption}
             </Text>
+          ) : null}
+          {current && total !== null && total > 0 ? (
+            <View className="w-full max-w-card gap-1.5 self-center">
+              <View
+                accessibilityRole="progressbar"
+                accessibilityLabel={`${seenCount} of ${total} books seen`}
+                className="h-[3px] w-full overflow-hidden rounded-full bg-edge dark:bg-edge-dark">
+                <View
+                  style={{ width: `${Math.min(seenCount / total, 1) * 100}%` }}
+                  className="h-full rounded-full bg-ember"
+                />
+              </View>
+              <Text className="text-center text-[11px] font-medium text-taupe dark:text-fog">
+                Book {Math.min(seenCount + 1, total)} of {total}
+              </Text>
+            </View>
           ) : null}
           <View className="w-full max-w-card flex-1 self-center">{renderBody()}</View>
         </View>
